@@ -14,9 +14,9 @@ from shapely.validation import make_valid
 from shapely.prepared import prep
 from shapely import STRtree
 regions = build.main()
-china, sar, strait = regions["china"], regions["hong-kong-macau-taiwan"], regions["taiwan-strait-waters"]
-def gcj(lat, lon): return china.contains(lat, lon) or sar.contains(lat, lon) or strait.contains(lat, lon)
-def mainland(lat, lon): return china.contains(lat, lon) and not sar.contains(lat, lon)
+base_region, auxiliary_region, supplemental_region = regions["china"], regions["hong-kong-macau-taiwan"], regions["taiwan-strait-waters"]
+def gcj(lat, lon): return base_region.contains(lat, lon) or auxiliary_region.contains(lat, lon) or supplemental_region.contains(lat, lon)
+def primary_area(lat, lon): return base_region.contains(lat, lon) and not auxiliary_region.contains(lat, lon)
 
 def brute(region, lat, lon):
     inside = False
@@ -28,8 +28,8 @@ def brute(region, lat, lon):
 
 random.seed(7)
 # 1. grid lookup equals brute-force even-odd on the same rings
-for region in (china, sar, strait):
-    bad = 0; n = 3000 if region is china else 6000
+for region in (base_region, auxiliary_region, supplemental_region):
+    bad = 0; n = 3000 if region is base_region else 6000
     for _ in range(n):
         lat = random.uniform(region.min_lat, region.min_lat + region.rows * 0.25)
         lon = random.uniform(region.min_lon, region.min_lon + region.columns * 0.25)
@@ -37,10 +37,10 @@ for region in (china, sar, strait):
     print(f"grid-vs-bruteforce {region.name}: {bad}/{n} mismatches")
 
 # 2. against the unsimplified OSM geometry
-orig_china = make_valid(shape(json.load(open("src/rel_270056.geojson"))))
-orig_sar = unary_union([make_valid(shape(json.load(open(f"src/rel_{i}.geojson")))) for i in (913110, 1867188, 449220)])
-pc, ps = prep(orig_china), prep(orig_sar)
-boundary = orig_china.boundary
+source_base = make_valid(shape(json.load(open("src/rel_270056.geojson"))))
+source_auxiliary = unary_union([make_valid(shape(json.load(open(f"src/rel_{i}.geojson")))) for i in (913110, 1867188, 449220)])
+pc, ps = prep(source_base), prep(source_auxiliary)
+boundary = source_base.boundary
 def near_boundary_points(n, max_offset_m):
     pts = []
     L = boundary.length
@@ -53,10 +53,10 @@ def near_boundary_points(n, max_offset_m):
 pts = near_boundary_points(20000, 1500)
 mism = []
 for lat, lon in pts:
-    if china.contains(lat, lon) != pc.contains(Point(lon, lat)):
+    if base_region.contains(lat, lon) != pc.contains(Point(lon, lat)):
         mism.append(boundary.distance(Point(lon, lat)) * 111320)
 mism.sort()
-print(f"china near-boundary (<=1.5 km) mismatches: {len(mism)}/{len(pts)}; distance to true boundary p50={mism[len(mism)//2] if mism else 0:.0f} m p99={mism[int(len(mism)*0.99)] if mism else 0:.0f} m max={max(mism) if mism else 0:.0f} m")
+print(f"base geometry near-boundary (<=1.5 km) mismatches: {len(mism)}/{len(pts)}; distance to source geometry p50={mism[len(mism)//2] if mism else 0:.0f} m p99={mism[int(len(mism)*0.99)] if mism else 0:.0f} m max={max(mism) if mism else 0:.0f} m")
 
 # 3. named points
 P = {
@@ -77,10 +77,10 @@ P = {
 }
 fail = 0
 for k, (lat, lon, eg, em) in P.items():
-    g, m = gcj(lat, lon), mainland(lat, lon)
+    g, m = gcj(lat, lon), primary_area(lat, lon)
     og = pc.contains(Point(lon, lat)) or ps.contains(Point(lon, lat))
     d = boundary.distance(Point(lon, lat)) * 111320
     ok = (g == eg and m == em)
     fail += not ok
-    print(f"{'OK ' if ok else 'BAD'} {k:34s} gcj={int(g)} mainland={int(m)} (expected {int(eg)}/{int(em)}) dist_to_china_boundary={d:7.0f} m")
+    print(f"{'OK ' if ok else 'BAD'} {k:34s} gcj={int(g)} primary_area={int(m)} (expected {int(eg)}/{int(em)}) dist_to_source_boundary={d:7.0f} m")
 print("named failures:", fail)
