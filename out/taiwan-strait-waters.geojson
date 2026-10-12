@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"region": "taiwan-strait-waters", "osm_relations": [], "simplify_tolerance_degrees": null, "source": "hand-drawn strait polygon, see build.py"}, "geometry": {"type": "Polygon", "coordinates": [[[117.2, 23.5], [119.6, 26.0], [121.6, 25.35], [120.85, 21.9], [117.2, 23.5]]]}}]}
