@@ -29,13 +29,12 @@ CELL_SIZE_DEGREES = 0.25
 SOURCE_NOTE = "polygons.openstreetmap.fr export of the OSM relations, downloaded 2026-10-12"
 
 RELATIONS = {
-    "china": [270056],  # People's Republic of China, includes Hong Kong and Macau
-    "hong-kong-macau-taiwan": [913110, 1867188, 449220],
+    "china": [270056],  # Base geometry input
+    "hong-kong-macau-taiwan": [913110, 1867188, 449220],  # Auxiliary geometry input
 }
 
-# Open water of the Taiwan Strait between the mainland and Taiwan territorial
-# seas. Corners sit on Fujian/Guangdong coastal waters and on Taiwan, so the
-# polygon only adds the strait itself. (longitude, latitude)
+# Supplemental coverage polygon used by the coordinate rendering lookup.
+# Coordinates are in (longitude, latitude) order.
 TAIWAN_STRAIT_WATERS = [
     (117.20, 23.50),
     (119.60, 26.00),
