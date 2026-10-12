@@ -1,26 +1,34 @@
 # Life in Mist boundary data
 
-Simplified OpenStreetMap boundaries used by the Life in Mist iOS app to decide
-how a GPS point is stored and drawn:
+Simplified geometry and lookup data used by the Life in Mist iOS app for point
+classification and coordinate rendering.
 
-- **GCJ zone**: mainland China, Hong Kong, Macau and Taiwan (including Kinmen,
-  Matsu and Penghu), their territorial seas, and the open water of the Taiwan
-  Strait. Inside this zone China-mode maps draw coordinates in GCJ-02.
-- **Mainland administrative area**: the China boundary minus Hong Kong, Macau
-  and Taiwan.
+## Data inputs
 
-The app composes both from three regions in `out/`:
+The app combines three geometry inputs from `out/`:
 
-| File | Content |
-| --- | --- |
-| `china.geojson` | OSM relation 270056 (People's Republic of China, includes Hong Kong, Macau and the waters around Kinmen and Matsu) |
-| `hong-kong-macau-taiwan.geojson` | OSM relations 913110 (Hong Kong), 1867188 (Macau), 449220 (Taiwan) |
-| `taiwan-strait-waters.geojson` | Hand-drawn polygon closing the strait between the two territorial seas (see `build.py`) |
-| `BoundaryRegionData.swift` | The same regions as encoded polylines plus a 0.25° lookup grid, compiled into the app |
+| Technical role | File | Input |
+| --- | --- | --- |
+| Base geometry | `china.geojson` | OSM relation 270056 |
+| Auxiliary geometry | `hong-kong-macau-taiwan.geojson` | Union of OSM relations 913110, 1867188 and 449220 |
+| Supplemental coverage geometry | `taiwan-strait-waters.geojson` | Manually defined polygon in `build.py` |
+| Encoded lookup data | `BoundaryRegionData.swift` | The same regions as encoded polylines plus a 0.25° lookup grid |
 
-GCJ zone = china ∪ hong-kong-macau-taiwan ∪ taiwan-strait-waters;
-mainland area = china − hong-kong-macau-taiwan. Disputed areas follow the
-OpenStreetMap boundaries as exported.
+The existing file names and region identifiers are stable technical keys used
+by the app and the build scripts.
+
+## Point classification
+
+The app uses the geometry inputs for two lookups:
+
+```text
+rendering coverage = base geometry ∪ auxiliary geometry ∪ supplemental geometry
+primary processing region = base geometry − auxiliary geometry
+```
+
+The rendering coverage lookup determines where the app draws coordinates in
+GCJ-02 when using its GCJ-02 map mode. The primary processing lookup tests
+whether a point is inside the base geometry and outside the auxiliary geometry.
 
 ## Source
 
@@ -28,21 +36,25 @@ OpenStreetMap boundaries as exported.
 [polygons.openstreetmap.fr](https://polygons.openstreetmap.fr/) (`params=0`),
 downloaded on 2026-10-12.
 
-## Processing
+## Generation and validation
 
 `build.py` repairs the geometry (`make_valid`), simplifies it with a tolerance of
-0.001° (about 110 m; the largest deviation from the unsimplified boundary
-measured by `validate.py` was 99 m), rounds coordinates to 1e-5°, and builds the
-grid. Each grid cell is either uniformly inside, uniformly outside, or crossed by
-the boundary; a point in a crossed cell is resolved by counting the edges between
-it and the cell centre. The app's lookup (`BoundaryRegion.swift`) uses the same
-rules and must change together with `build.py`.
+0.001°, rounds coordinates to 1e-5°, and builds the grid. Each grid cell is either
+uniformly inside, uniformly outside, or crossed by the geometry boundary. A
+point in a crossed cell is resolved by counting the edges between it and the
+cell centre. The app's lookup (`BoundaryRegion.swift`) uses the same rules and
+must change together with `build.py`.
+
+`validate.py` compares grid lookup results with direct ring checks, samples
+points near the source geometry, and checks predefined coordinates. Reported
+sample distances describe the sampled results, not a guaranteed maximum error
+bound for the complete geometry.
 
 ```sh
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 venv/bin/python build.py       # writes out/
-venv/bin/python validate.py    # grid vs brute force, simplified vs original, named test points
+venv/bin/python validate.py    # grid vs direct rings, source comparison, predefined points
 ```
 
 ## Licenses
